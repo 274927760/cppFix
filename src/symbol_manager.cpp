@@ -7,6 +7,7 @@
 #include <regex>
 #include <pmap.h>
 #include <elfio/elfio.hpp>
+#include <dlfcn.h>
 
 Symbol_manager::Symbol_manager() {
     elf_path = get_cur_elf_path();  // 存下当前elf文件的路径
@@ -16,7 +17,6 @@ Symbol_manager::Symbol_manager() {
 
 // 这里为一些初始化的逻辑
 // 读取elf
-// 把符号表预处理进来，方便做查询
 void Symbol_manager::init()
 {
     // 读取 ELF 文件
@@ -72,7 +72,6 @@ void Symbol_manager::pre_deal_some_section(){
         ELFIO::Elf_Xword size;
         unsigned char bind, type, other;
         ELFIO::Elf_Half section_index;
-
         // 获取符号的各项信息
         if (symbols_accessor->get_symbol(i, name, value, size, bind, type, section_index, other)) {
             // 使用 std::regex_search 来查找
@@ -98,7 +97,7 @@ void Symbol_manager::pre_deal_some_section(){
 ELFIO::Elf64_Addr Symbol_manager::get_addr_by_name(const std::string &symbol_name)
 {
     ELFIO::Elf64_Addr res = 0;
-    if(symbol_name.empty()) return res;
+    if(symbol_name.empty()) return 0;
     // 遍历所有符号
     for (size_t i = 0; i < symbols_accessor->get_symbols_num(); ++i) {
         // 获取符号的详细信息
@@ -132,7 +131,7 @@ void Symbol_manager::test_addr_terminal(){
             std::cout << "cur symbol does not in func_table !!!" << std::endl;
             continue;
         }
-        std::cout << "cur addr = " << std::hex << func_table[symbol_name] << std::dec << std::endl;
+        printf("cur_addr = %p\n", addr);
     }
 }
 
@@ -149,6 +148,31 @@ std::string Symbol_manager::get_cur_elf_path(){
     }
     return res;
 }
+
+
+// 解析so 并解析符号
+void Symbol_manager::open_so_and_load_symbols(const std::string &so_path) {
+    void *handle = dlopen(so_path.c_str(), RTLD_LAZY);
+    if(!handle){
+        std::cerr << "Failed to load shared lib" << dlerror() << std::endl;
+        return;
+    }
+    so_handler_table[so_path] = handle;
+    std::cout << "load " << so_path << " suc!!!" << std::endl;
+}
+
+
+ELFIO::Elf64_Addr Symbol_manager::get_addr_from_some_so(const std::string &so_path, const std::string &symbol_name)
+{
+    if(so_handler_table.find(so_path) == so_handler_table.end())
+    {
+        open_so_and_load_symbols(so_path);
+    }
+    void *cur_handle = so_handler_table[so_path];
+    void *new_func_addr = dlsym(cur_handle, symbol_name.c_str());
+    return (ELFIO::Elf64_Addr) new_func_addr;
+}
+
 
 std::string Symbol_manager::get_elf_path(){
     return elf_path;

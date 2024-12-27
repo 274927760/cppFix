@@ -9,19 +9,41 @@
 #include <regex>
 #include <symbol_manager.h>
 #include <pmap.h>
-
-int add(int a, int b)
+#include <hotfix_signal.h>
+#include <hotfix.h>
+Symbol_manager* symbol_manager;
+Hotfix_manager* hotfix_manager;
+__attribute__((noinline)) int add(int a, int b)
 {
     return a + b;
 }
 
-int mul(int a, int b)
+void game()
 {
-    return a * b;
+    while (true) {
+        int a, b;
+        std::cout << "please input (a,b): ";
+        if (!(std::cin >> a >> b)) {    // 检查输入流的状态
+            std::cout << "invalid input" << std::endl;
+            std::cin.clear();   // 清除输入流的错误状态
+            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');   // 忽略之前错误的输入
+            continue;
+        }
+        int res = add(a, b);
+        std::cout << "res = " << res << std::endl;
+    }
+}
+
+void init(){
+    symbol_manager = new Symbol_manager();
+    hotfix_manager = new Hotfix_manager();
 }
 int main() {
     printf("global_func addr = %p\n", &add);
-    Symbol_manager s = Symbol_manager();
-    s.test_addr_terminal();
+    init();
+//    symbol_manager->test_addr_terminal();
+    hotfix_signal::register_signal();
+//    hotfix_signal::test_send_and_receive_signal();
+    game();
     return 0;
 }
